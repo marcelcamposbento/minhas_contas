@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Minhas Contas</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root {
+    --green-deep: #0d5c3a;
+    --green-mid: #1a7a50;
+    --green-bright: #22a06b;
+    --green-light: #d4f5e2;
+    --green-pale: #f0fdf6;
+    --accent: #f5a623;
+    --accent-red: #e05050;
+    --accent-blue: #4a9eff;
+    --text-dark: #0a1a12;
+    --text-mid: #2d5040;
+    --text-light: #6b9e84;
+    --white: #ffffff;
+    --shadow: 0 4px 24px rgba(13,92,58,0.10);
+    --radius: 18px;
+    --radius-sm: 10px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--green-pale);
+    min-height: 100vh;
+    color: var(--text-dark);
+    max-width: 480px;
+    margin: 0 auto;
+  }
+  .header {
+    background: linear-gradient(135deg, var(--green-deep) 0%, var(--green-mid) 100%);
+    padding: 18px 20px 24px;
+    position: sticky; top: 0; z-index: 100;
+    box-shadow: 0 4px 20px rgba(13,92,58,0.25);
+  }
+  .header-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+  .header-title { font-family: 'Syne', sans-serif; font-size: 22px; font-weight: 800; color: white; }
+  .btn-icon {
+    width: 38px; height: 38px; border: none; border-radius: 50%;
+    background: rgba(255,255,255,0.15); color: white; font-size: 20px;
+    cursor: pointer; display: flex; align-items: center; justify-content: center;
+    transition: background 0.2s;
+  }
+  .btn-icon:hover { background: rgba(255,255,255,0.28); }
+  .month-nav {
+    display: flex; align-items: center; justify-content: space-between;
+    background: rgba(255,255,255,0.13); border-radius: var(--radius-sm); padding: 8px 12px;
+  }
+  .month-label { font-family: 'Syne', sans-serif; font-size: 17px; font-weight: 700; color: white; }
+  .btn-month { background: none; border: none; color: white; font-size: 20px; cursor: pointer; padding: 2px 8px; border-radius: 6px; transition: background 0.2s; }
+  .btn-month:hover { background: rgba(255,255,255,0.2); }
+  .summary { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding: 20px 16px 8px; }
+  .summary-card {
+    background: white; border-radius: var(--radius); padding: 16px 14px;
+    box-shadow: var(--shadow); border-left: 4px solid var(--green-bright);
+    animation: slideUp 0.35s ease both;
+  }
+  .summary-card.danger { border-left-color: var(--accent-red); }
+  .summary-card.warn { border-left-color: var(--accent); }
+  .summary-label { font-size: 11px; font-weight: 500; color: var(--text-light); text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 6px; }
+  .summary-value { font-family: 'Syne', sans-serif; font-size: 18px; font-weight: 800; color: var(--text-dark); }
+  .summary-card.danger .summary-value { color: var(--accent-red); }
+  .summary-card.warn .summary-value { color: #c47b00; }
+  .filter-tabs { display: flex; gap: 8px; padding: 8px 16px 0; overflow-x: auto; scrollbar-width: none; }
+  .filter-tabs::-webkit-scrollbar { display: none; }
+  .filter-tab { padding: 6px 14px; border-radius: 20px; border: none; font-size: 12px; font-weight: 600; cursor: pointer; white-space: nowrap; transition: all 0.2s; background: var(--green-light); color: var(--green-mid); }
+  .filter-tab.active { background: var(--green-mid); color: white; }
+  .section-header { display: flex; justify-content: space-between; align-items: center; padding: 14px 16px 8px; }
+  .section-title { font-family: 'Syne', sans-serif; font-size: 13px; font-weight: 700; color: var(--text-light); text-transform: uppercase; letter-spacing: 1px; }
+  .list { padding: 0 16px 120px; }
+  .expense-item {
+    background: white; border-radius: var(--radius); padding: 14px 16px; margin-bottom: 10px;
+    display: flex; align-items: center; gap: 14px; box-shadow: var(--shadow);
+    transition: transform 0.18s, box-shadow 0.18s; animation: slideUp 0.3s ease both; cursor: pointer;
+  }
+  .expense-item:hover { transform: translateY(-2px); box-shadow: 0 8px 28px rgba(13,92,58,0.14); }
+  .expense-icon { width: 44px; height: 44px; min-width: 44px; border-radius: 12px; background: var(--green-light); display: flex; align-items: center; justify-content: center; font-size: 20px; }
+  .expense-info { flex: 1; min-width: 0; }
+  .expense-name { font-family: 'Syne', sans-serif; font-weight: 700; font-size: 15px; color: var(--text-dark); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .expense-date { font-size: 12px; color: var(--text-light); margin-top: 2px; }
+  .expense-right { text-align: right; }
+  .expense-amount { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 16px; color: var(--text-dark); }
+  .badge { display: inline-block; font-size: 10px; font-weight: 600; padding: 2px 8px; border-radius: 20px; margin-top: 4px; letter-spacing: 0.5px; }
+  .badge-paid { background: #d4f5e2; color: var(--green-mid); }
+  .badge-pending { background: #fff3d4; color: #c47b00; }
+  .badge-overdue { background: #ffe0e0; color: var(--accent-red); }
+  .recurring-dot { width: 7px; height: 7px; background: var(--accent-blue); border-radius: 50%; display: inline-block; margin-left: 5px; vertical-align: middle; }
+  .empty { text-align: center; padding: 48px 24px; color: var(--text-light); }
+  .empty-icon { font-size: 56px; margin-bottom: 16px; }
+  .loading { text-align: center; padding: 40px; color: var(--text-light); font-size: 15px; }
+  .spinner { display: inline-block; width: 32px; height: 32px; border: 3px solid var(--green-light); border-top-color: var(--green-bright); border-radius: 50%; animation: spin 0.8s linear infinite; margin-bottom: 12px; }
+  .total-bar {
+    position: fixed; bottom: 0; left: 50%; transform: translateX(-50%);
+    width: 100%; max-width: 480px;
+    background: linear-gradient(135deg, var(--green-deep), var(--green-mid));
+    padding: 14px 20px 20px; z-index: 50;
+    box-shadow: 0 -4px 24px rgba(13,92,58,0.2);
+  }
+  .total-row { display: flex; justify-content: space-between; align-items: center; }
+  .total-label { font-size: 13px; color: rgba(255,255,255,0.75); font-weight: 500; }
+  .total-value { font-family: 'Syne', sans-serif; font-size: 16px; font-weight: 800; color: white; }
+  .total-row.main .total-label { font-size: 14px; font-weight: 600; color: rgba(255,255,255,0.9); }
+  .total-row.main .total-value { font-size: 22px; }
+  .divider { height: 1px; background: rgba(255,255,255,0.15); margin: 10px 0; }
+  .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(10,26,18,0.55); backdrop-filter: blur(6px); z-index: 200; align-items: flex-end; justify-content: center; }
+  .modal-overlay.open { display: flex; animation: fadeIn 0.2s ease; }
+  .modal { background: white; border-radius: 28px 28px 0 0; padding: 24px 20px 36px; width: 100%; max-width: 480px; animation: slideUpModal 0.3s ease; max-height: 90vh; overflow-y: auto; }
+  .modal-handle { width: 40px; height: 4px; background: #dde8e3; border-radius: 4px; margin: 0 auto 20px; }
+  .modal-title { font-family: 'Syne', sans-serif; font-size: 20px; font-weight: 800; color: var(--text-dark); margin-bottom: 20px; }
+  .form-group { margin-bottom: 16px; }
+  .form-label { display: block; font-size: 12px; font-weight: 600; color: var(--text-light); text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 6px; }
+  .form-input { width: 100%; padding: 13px 14px; border: 2px solid #e0ede8; border-radius: var(--radius-sm); font-family: 'DM Sans', sans-serif; font-size: 15px; color: var(--text-dark); background: var(--green-pale); transition: border-color 0.2s; outline: none; }
+  .form-input:focus { border-color: var(--green-bright); background: white; }
+  .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .emoji-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; margin-top: 8px; }
+  .emoji-btn { width: 100%; aspect-ratio: 1; border: 2px solid transparent; border-radius: 10px; background: var(--green-pale); font-size: 20px; cursor: pointer; transition: all 0.15s; display: flex; align-items: center; justify-content: center; }
+  .emoji-btn:hover { background: var(--green-light); }
+  .emoji-btn.selected { border-color: var(--green-bright); background: var(--green-light); }
+  .status-toggle { display: flex; gap: 8px; margin-top: 8px; }
+  .status-btn { flex: 1; padding: 10px 8px; border-radius: 8px; border: 2px solid #e0ede8; background: var(--green-pale); font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.15s; color: var(--text-mid); }
+  .status-btn.active-paid { border-color: var(--green-bright); background: var(--green-light); color: var(--green-mid); }
+  .status-btn.active-pending { border-color: var(--accent); background: #fff8e8; color: #c47b00; }
+  .status-btn.active-overdue { border-color: var(--accent-red); background: #fff0f0; color: var(--accent-red); }
+  .btn-primary { width: 100%; padding: 15px; background: linear-gradient(135deg, var(--green-mid), var(--green-deep)); color: white; border: none; border-radius: var(--radius-sm); font-family: 'Syne', sans-serif; font-size: 16px; font-weight: 700; cursor: pointer; margin-top: 8px; transition: opacity 0.2s, transform 0.1s; }
+  .btn-primary:hover { opacity: 0.9; }
+  .btn-primary:active { transform: scale(0.98); }
+  .btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
+  .btn-danger { width: 100%; padding: 13px; background: none; color: var(--accent-red); border: 2px solid #ffd4d4; border-radius: var(--radius-sm); font-family: 'Syne', sans-serif; font-size: 15px; font-weight: 700; cursor: pointer; margin-top: 8px; transition: background 0.2s; }
+  .btn-danger:hover { background: #fff0f0; }
+  .toast { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); background: var(--green-deep); color: white; padding: 12px 24px; border-radius: 30px; font-size: 14px; font-weight: 600; z-index: 999; animation: fadeIn 0.3s ease; box-shadow: 0 4px 20px rgba(0,0,0,0.2); }
+  @keyframes slideUp { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
+  @keyframes slideUpModal { from { transform: translateY(100%); } to { transform: translateY(0); } }
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-top">
+    <div class="header-title">💰 Minhas Contas</div>
+    <button class="btn-icon" onclick="openModal()" title="Nova conta">＋</button>
+  </div>
+  <div class="month-nav">
+    <button class="btn-month" onclick="changeMonth(-1)">‹</button>
+    <span class="month-label" id="monthLabel"></span>
+    <button class="btn-month" onclick="changeMonth(1)">›</button>
+  </div>
+</div>
+
+<div class="summary" id="summary"></div>
+
+<div class="filter-tabs">
+  <button class="filter-tab active" onclick="setFilter('all', this)">Todas</button>
+  <button class="filter-tab" onclick="setFilter('pending', this)">⏳ Pendente</button>
+  <button class="filter-tab" onclick="setFilter('paid', this)">✅ Pago</button>
+  <button class="filter-tab" onclick="setFilter('overdue', this)">🔴 Atrasado</button>
+</div>
+
+<div class="section-header">
+  <span class="section-title" id="sectionTitle">Carregando...</span>
+</div>
+
+<div class="list" id="expenseList">
+  <div class="loading"><div class="spinner"></div><br>Conectando ao banco de dados...</div>
+</div>
+
+<div class="total-bar">
+  <div class="total-row">
+    <span class="total-label">Total pago</span>
+    <span class="total-value" id="totalPaid">R$ 0,00</span>
+  </div>
+  <div class="divider"></div>
+  <div class="total-row main">
+    <span class="total-label">A pagar</span>
+    <span class="total-value" id="totalPending">R$ 0,00</span>
+  </div>
+</div>
+
+<!-- MODAL -->
+<div class="modal-overlay" id="modalOverlay" onclick="closeModalOutside(event)">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title" id="modalTitle">Nova Conta</div>
+    <div class="form-group">
+      <label class="form-label">Nome da conta</label>
+      <input class="form-input" id="inputName" type="text" placeholder="Ex: Luz, Internet, Escola...">
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Valor (R$)</label>
+        <input class="form-input" id="inputAmount" type="number" step="0.01" placeholder="0,00">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Data de venc.</label>
+        <input class="form-input" id="inputDate" type="date">
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Ícone</label>
+      <div class="emoji-grid" id="emojiGrid"></div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Status</label>
+      <div class="status-toggle">
+        <button class="status-btn active-pending" data-status="pending" onclick="selectStatus('pending')">⏳ Pendente</button>
+        <button class="status-btn" data-status="paid" onclick="selectStatus('paid')">✅ Pago</button>
+        <button class="status-btn" data-status="overdue" onclick="selectStatus('overdue')">🔴 Atrasado</button>
+      </div>
+    </div>
+    <div class="form-group" style="display:flex;align-items:center;gap:12px;background:var(--green-pale);padding:12px;border-radius:10px;">
+      <input type="checkbox" id="inputRecurring" style="width:18px;height:18px;accent-color:var(--green-bright);">
+      <label for="inputRecurring" style="font-size:14px;font-weight:500;cursor:pointer;">🔁 Repetir todo mês (conta fixa)</label>
+    </div>
+    <button class="btn-primary" id="btnSave" onclick="saveExpense()">Salvar Conta</button>
+    <button class="btn-danger" id="btnDelete" style="display:none" onclick="deleteExpense()">🗑 Excluir conta</button>
+    <button class="btn-danger" onclick="closeModal()" style="border-color:#e0ede8;color:var(--text-light);margin-top:6px;">Cancelar</button>
+  </div>
+</div>
+
+<script>
+const SUPABASE_URL = 'https://glyxavyvsfifcksjmlem.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_YNuKTtWYhlUNPnRPNiYWSQ_BPDYucb-';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+const EMOJIS = ['💡','🚗','🏠','📱','🌊','🏫','🏥','💊','🛒','🍕','☕','🎓','⚡','🌐','💳','📺','🎮','✈️','🏋️','💰','🔧','📦','🎁','👕','🐾','🚿','🧾','💼'];
+const MONTHS_PT = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+
+let currentMonth, currentYear, expenses = [], editingId = null, selectedEmoji = '💡', selectedStatus = 'pending', currentFilter = 'all';
+
+async function init() {
+  const now = new Date();
+  currentMonth = now.getMonth();
+  currentYear = now.getFullYear();
+  renderEmojiGrid();
+  updateMonthLabel();
+  await loadExpenses();
+}
+
+function updateMonthLabel() {
+  document.getElementById('monthLabel').textContent = `${MONTHS_PT[currentMonth]} / ${currentYear}`;
+}
+
+async function loadExpenses() {
+  document.getElementById('expenseList').innerHTML = '<div class="loading"><div class="spinner"></div><br>Carregando...</div>';
+  const { data, error } = await sb.from('contas').select('*').order('date', { ascending: true });
+  if (error) { showToast('❌ Erro ao carregar: ' + error.message); return; }
+  expenses = data || [];
+  render();
+}
+
+function render() {
+  updateMonthLabel();
+  renderSummary();
+  renderList();
+}
+
+function fmt(v) {
+  return 'R$ ' + Number(v).toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+}
+
+function getMonthExpenses() {
+  const thisMonth = expenses.filter(e => e.year === currentYear && e.month === currentMonth);
+  const recurringIds = new Set(thisMonth.map(e => e.recurring_id || e.id));
+
+  const recurring = expenses.filter(e =>
+    e.recurring &&
+    !(e.year === currentYear && e.month === currentMonth) &&
+    !recurringIds.has(e.recurring_id || e.id)
+  );
+
+  const seen = new Set(recurringIds);
+  const extras = [];
+  recurring.forEach(r => {
+    const rid = r.recurring_id || r.id;
+    if (!seen.has(rid)) {
+      seen.add(rid);
+      extras.push({ ...r, id: `virtual_${rid}_${currentYear}_${currentMonth}`, year: currentYear, month: currentMonth, status: 'pending', recurring_id: rid, _virtual: true });
+    }
+  });
+
+  return [...thisMonth, ...extras];
+}
+
+function renderSummary() {
+  const items = getMonthExpenses();
+  const total = items.reduce((s, e) => s + Number(e.amount), 0);
+  const paid = items.filter(e => e.status === 'paid').reduce((s, e) => s + Number(e.amount), 0);
+  const pending = items.filter(e => e.status !== 'paid').reduce((s, e) => s + Number(e.amount), 0);
+  const overdue = items.filter(e => e.status === 'overdue').reduce((s, e) => s + Number(e.amount), 0);
+
+  document.getElementById('summary').innerHTML = `
+    <div class="summary-card" style="animation-delay:.05s"><div class="summary-label">Total do mês</div><div class="summary-value">${fmt(total)}</div></div>
+    <div class="summary-card warn" style="animation-delay:.1s"><div class="summary-label">Pendente</div><div class="summary-value">${fmt(pending)}</div></div>
+    <div class="summary-card" style="animation-delay:.15s"><div class="summary-label">Pago</div><div class="summary-value" style="color:var(--green-mid)">${fmt(paid)}</div></div>
+    <div class="summary-card danger" style="animation-delay:.2s"><div class="summary-label">Atrasado</div><div class="summary-value">${fmt(overdue)}</div></div>
+  `;
+  document.getElementById('totalPaid').textContent = fmt(paid);
+  document.getElementById('totalPending').textContent = fmt(pending);
+}
+
+function renderList() {
+  let items = getMonthExpenses();
+  const count = items.length;
+  if (currentFilter !== 'all') items = items.filter(e => e.status === currentFilter);
+  items.sort((a, b) => new Date(a.date) - new Date(b.date));
+
+  document.getElementById('sectionTitle').textContent = `${count} conta${count !== 1 ? 's' : ''} em ${MONTHS_PT[currentMonth]}`;
+
+  if (items.length === 0) {
+    document.getElementById('expenseList').innerHTML = '<div class="empty"><div class="empty-icon">📭</div><div class="empty-text">Nenhuma conta aqui.<br>Toque em + para adicionar!</div></div>';
+    return;
+  }
+
+  document.getElementById('expenseList').innerHTML = items.map((e, i) => {
+    const bc = e.status === 'paid' ? 'badge-paid' : e.status === 'overdue' ? 'badge-overdue' : 'badge-pending';
+    const bt = e.status === 'paid' ? '✅ pago' : e.status === 'overdue' ? '🔴 atrasado' : '⏳ pendente';
+    const dateStr = e.date ? new Date(e.date + 'T12:00:00').toLocaleDateString('pt-BR') : '';
+    return `
+      <div class="expense-item" onclick="openEdit('${e.id}')" style="animation-delay:${i*0.04}s">
+        <div class="expense-icon">${e.icon || '💡'}</div>
+        <div class="expense-info">
+          <div class="expense-name">${e.name}${e.recurring ? '<span class="recurring-dot"></span>' : ''}</div>
+          <div class="expense-date">${dateStr}</div>
+        </div>
+        <div class="expense-right">
+          <div class="expense-amount">${fmt(e.amount)}</div>
+          <span class="badge ${bc}">${bt}</span>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function changeMonth(d) {
+  currentMonth += d;
+  if (currentMonth > 11) { currentMonth = 0; currentYear++; }
+  if (currentMonth < 0) { currentMonth = 11; currentYear--; }
+  render();
+}
+
+function setFilter(f, el) {
+  currentFilter = f;
+  document.querySelectorAll('.filter-tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  renderList();
+}
+
+function openModal(expense = null) {
+  editingId = expense ? expense.id : null;
+  document.getElementById('modalTitle').textContent = expense ? 'Editar Conta' : 'Nova Conta';
+  document.getElementById('inputName').value = expense ? expense.name : '';
+  document.getElementById('inputAmount').value = expense ? expense.amount : '';
+  document.getElementById('inputDate').value = expense ? expense.date : `${currentYear}-${String(currentMonth+1).padStart(2,'0')}-01`;
+  document.getElementById('inputRecurring').checked = expense ? !!expense.recurring : false;
+  document.getElementById('btnDelete').style.display = expense && !expense._virtual ? 'block' : 'none';
+  selectedEmoji = expense ? (expense.icon || '💡') : '💡';
+  selectedStatus = expense ? expense.status : 'pending';
+  updateEmojiSelection();
+  updateStatusSelection();
+  document.getElementById('modalOverlay').classList.add('open');
+}
+
+function openEdit(id) {
+  const e = getMonthExpenses().find(x => x.id === id);
+  if (e) openModal(e);
+}
+
+function closeModal() { document.getElementById('modalOverlay').classList.remove('open'); }
+function closeModalOutside(e) { if (e.target === document.getElementById('modalOverlay')) closeModal(); }
+
+async function saveExpense() {
+  const name = document.getElementById('inputName').value.trim();
+  const amount = parseFloat(document.getElementById('inputAmount').value);
+  const date = document.getElementById('inputDate').value;
+  const recurring = document.getElementById('inputRecurring').checked;
+
+  if (!name || isNaN(amount) || !date) { showToast('⚠️ Preencha nome, valor e data!'); return; }
+
+  const btn = document.getElementById('btnSave');
+  btn.disabled = true; btn.textContent = 'Salvando...';
+
+  const payload = { name, amount, date, icon: selectedEmoji, status: selectedStatus, recurring, month: currentMonth, year: currentYear };
+
+  let error;
+  if (editingId && !editingId.startsWith('virtual_')) {
+    ({ error } = await sb.from('contas').update(payload).eq('id', editingId));
+  } else if (editingId && editingId.startsWith('virtual_')) {
+    // Salvar instância virtual como registro real
+    const recurringId = editingId.replace(`virtual_`, '').replace(`_${currentYear}_${currentMonth}`, '');
+    ({ error } = await sb.from('contas').insert({ ...payload, recurring_id: recurringId }));
+  } else {
+    const insertData = { ...payload };
+    if (recurring) insertData.recurring_id = null; // will be set after insert
+    const { data: inserted, error: err } = await sb.from('contas').insert(insertData).select().single();
+    error = err;
+    // Set recurring_id to own id for new recurring items
+    if (!err && recurring && inserted) {
+      await sb.from('contas').update({ recurring_id: inserted.id }).eq('id', inserted.id);
+    }
+  }
+
+  btn.disabled = false; btn.textContent = 'Salvar Conta';
+
+  if (error) { showToast('❌ Erro: ' + error.message); return; }
+  showToast('✅ Conta salva!');
+  closeModal();
+  await loadExpenses();
+}
+
+async function deleteExpense() {
+  if (!confirm('Excluir esta conta?')) return;
+  const { error } = await sb.from('contas').delete().eq('id', editingId);
+  if (error) { showToast('❌ Erro ao excluir'); return; }
+  showToast('🗑 Conta excluída');
+  closeModal();
+  await loadExpenses();
+}
+
+function renderEmojiGrid() {
+  document.getElementById('emojiGrid').innerHTML = EMOJIS.map(em =>
+    `<button class="emoji-btn${em === selectedEmoji ? ' selected' : ''}" onclick="pickEmoji('${em}')">${em}</button>`
+  ).join('');
+}
+function pickEmoji(em) { selectedEmoji = em; updateEmojiSelection(); }
+function updateEmojiSelection() { document.querySelectorAll('.emoji-btn').forEach(b => b.classList.toggle('selected', b.textContent === selectedEmoji)); }
+function selectStatus(s) { selectedStatus = s; updateStatusSelection(); }
+function updateStatusSelection() { document.querySelectorAll('.status-btn').forEach(b => { b.classList.remove('active-paid','active-pending','active-overdue'); if (b.dataset.status === selectedStatus) b.classList.add(`active-${selectedStatus}`); }); }
+
+function showToast(msg) {
+  const t = document.createElement('div');
+  t.className = 'toast'; t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 2800);
+}
+
+init();
+</script>
+</body>
+</html>
